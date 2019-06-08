@@ -187,6 +187,12 @@ function updateTransientState(state, props, attachTouch) {
   return { ...state, ...addState }
 }
 
+function computeComponentState({ trackMouse }, { _set }) {
+  const [handlers, attachTouch] = getHandlers(_set, { trackMouse })
+
+  return { trackMouse, handlers, attachTouch, _set }
+}
+
 export function useSwipeable(props) {
   const { trackMouse } = props
   const transientState = React.useRef({ ...initialState, type: 'hook' })
@@ -230,18 +236,27 @@ export class Swipeable extends React.PureComponent {
 
   static defaultProps = defaultProps
 
-  constructor(props) {
-    super(props)
-    this.transientState = { ...initialState, type: 'class' }
+  static getDerivedStateFromProps(props, state) {
+    if (state.trackMouse !== props.trackMouse) {
+      return computeComponentState(props, state)
+    }
+    return null
   }
 
-  _set = cb => {
-    this.transientState = cb(this.transientState, this.props)
+  constructor(props) {
+    super(props)
+
+    this.transientState = { ...initialState, type: 'class' }
+    this.state = computeComponentState(props, {
+      _set: cb => {
+        this.transientState = cb(this.transientState, this.props)
+      }
+    })
   }
 
   render() {
-    const { className, style, nodeName = 'div', innerRef, children, trackMouse } = this.props
-    const [handlers, attachTouch] = getHandlers(this._set, { trackMouse })
+    const { className, style, nodeName = 'div', innerRef, children } = this.props
+    const { attachTouch, handlers } = this.state
     this.transientState = updateTransientState(this.transientState, this.props, attachTouch)
     const ref = innerRef ? el => (innerRef(el), handlers.ref(el)) : handlers.ref
     return React.createElement(nodeName, { ...handlers, className, style, ref }, children)
